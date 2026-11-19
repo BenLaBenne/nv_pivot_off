@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PIVOT Online</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/assets/skins/skin_classic.svg" type="image/svg+xml">
+</head>
+<body>
+  <!-- ============== AUTH SCREEN ============== -->
+  <div id="auth-screen" class="screen active">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <img src="/assets/skins/skin_classic.svg" alt="PIVOT" width="80" height="80">
+        <h1>PIVOT <span class="logo-accent">Online</span></h1>
+        <p class="tagline">Le jeu de réflexion abstrait — multijoueur</p>
+      </div>
+      <div class="auth-tabs">
+        <button class="tab-btn active" data-tab="login">Connexion</button>
+        <button class="tab-btn" data-tab="signup">Inscription</button>
+      </div>
+      <form id="login-form" class="auth-form active">
+        <input type="text" name="username" placeholder="Nom d'utilisateur" autocomplete="username" required>
+        <input type="password" name="password" placeholder="Mot de passe" autocomplete="current-password" required>
+        <button type="submit" class="btn-primary">Se connecter</button>
+        <p class="auth-error" id="login-error"></p>
+      </form>
+      <form id="signup-form" class="auth-form">
+        <input type="text" name="username" placeholder="Nom d'utilisateur (3-32 caractères)" autocomplete="username" required minlength="3" maxlength="32">
+        <input type="password" name="password" placeholder="Mot de passe (6 caractères min)" autocomplete="new-password" required minlength="6">
+        <button type="submit" class="btn-primary">Créer un compte</button>
+        <p class="auth-error" id="signup-error"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============== MAIN APP ============== -->
+  <div id="app-screen" class="screen">
+    <!-- TopBar -->
+    <header id="topbar">
+      <div class="topbar-left">
+        <span class="resource" id="topbar-pgs" title="Gems (Pgs)">
+          <span class="icon-gem">◆</span>
+          <span id="topbar-pgs-value">0</span>
+        </span>
+        <span class="resource" id="topbar-pbucks" title="Pbucks (en partie)">
+          <span class="icon-coin">●</span>
+          <span id="topbar-pbucks-value">0</span>
+        </span>
+      </div>
+      <div class="topbar-center">
+        <span class="resource" id="topbar-tr" title="Trophies (TR)">
+          <span class="icon-trophy">🏆</span>
+          <span id="topbar-tr-value">0</span>
+        </span>
+        <span class="rank-badge" id="topbar-rank">Plastique 1</span>
+      </div>
+      <div class="topbar-right">
+        <span id="topbar-username">—</span>
+        <button class="icon-btn" id="btn-gifts" title="Cadeaux">
+          🎁<span class="badge" id="gifts-badge" hidden>0</span>
+        </button>
+        <button class="icon-btn" id="btn-settings" title="Paramètres">⚙️</button>
+        <button class="icon-btn" id="btn-logout" title="Déconnexion">⏻</button>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main id="main-content">
+      <!-- Vues chargées dynamiquement -->
+    </main>
+
+    <!-- Bottom nav (style Brawl Stars) -->
+    <nav id="bottom-nav">
+      <button class="nav-btn active" data-route="dashboard">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Accueil</span>
+      </button>
+      <button class="nav-btn" data-route="game">
+        <span class="nav-icon">⚔️</span>
+        <span class="nav-label">Jouer</span>
+      </button>
+      <button class="nav-btn" data-route="shop">
+        <span class="nav-icon">🛒</span>
+        <span class="nav-label">Shop</span>
+      </button>
+      <button class="nav-btn" data-route="pass">
+        <span class="nav-icon">🎫</span>
+        <span class="nav-label">Pass</span>
+      </button>
+      <button class="nav-btn" data-route="top">
+        <span class="nav-icon">🏆</span>
+        <span class="nav-label">Top</span>
+      </button>
+      <button class="nav-btn" data-route="profile">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">Profil</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ============== GAME SCREEN ============== -->
+  <div id="game-screen" class="screen">
+    <header id="game-topbar">
+      <button class="icon-btn" id="btn-leave-game" title="Quitter">←</button>
+      <div id="game-info">
+        <span id="game-turn">—</span>
+        <span id="game-pivot-pos">D4</span>
+      </div>
+      <button class="icon-btn" id="btn-forfeit" title="Abandonner">🏳️</button>
+    </header>
+    <div id="game-main">
+      <div id="game-side-left">
+        <div class="player-card" id="player-red">
+          <div class="player-name">Rouge (horizontal)</div>
+          <div class="player-stats">
+            <span title="Bornes">🚧 <span class="cap-borne">3</span></span>
+            <span title="Virages (P)">↪ <span class="cap-pivot">2</span></span>
+            <span title="Diagonale (D)">⤢ <span class="cap-diagonale">1</span></span>
+            <span title="TP">⚡ <span class="cap-tp">1</span></span>
+          </div>
+          <div class="player-extras">
+            <span title="Clock">⏰ <span class="cap-clock">0</span></span>
+            <span title="Double Switch">🔄 <span class="cap-ds">0</span></span>
+            <span title="Hamer">🔨 <span class="cap-hamer">0</span></span>
+          </div>
+        </div>
+        <div class="player-card" id="player-blue">
+          <div class="player-name">Bleu (vertical)</div>
+          <div class="player-stats">
+            <span title="Bornes">🚧 <span class="cap-borne">3</span></span>
+            <span title="Virages (P)">↪ <span class="cap-pivot">2</span></span>
+            <span title="Diagonale (D)">⤢ <span class="cap-diagonale">1</span></span>
+            <span title="TP">⚡ <span class="cap-tp">1</span></span>
+          </div>
+          <div class="player-extras">
+            <span title="Clock">⏰ <span class="cap-clock">0</span></span>
+            <span title="Double Switch">🔄 <span class="cap-ds">0</span></span>
+            <span title="Hamer">🔨 <span class="cap-hamer">0</span></span>
+          </div>
+        </div>
+      </div>
+      <div id="game-board-wrapper">
+        <svg id="game-board" viewBox="-20 -20 760 760" xmlns="http://www.w3.org/2000/svg">
+          <!-- généré par JS -->
+        </svg>
+      </div>
+      <div id="game-side-right">
+        <div id="ability-buttons">
+          <button class="ability-btn" data-ability="glide">↔ Glisser</button>
+          <button class="ability-btn" data-ability="borne">🚧 Borne</button>
+          <button class="ability-btn" data-ability="virage">↪ Virage (P)</button>
+          <button class="ability-btn" data-ability="diagonale">⤢ Diagonale (D)</button>
+          <button class="ability-btn" data-ability="tp">⚡ TP</button>
+          <button class="ability-btn" data-ability="hamer">🔨 Hamer</button>
+          <button class="ability-btn" data-ability="clock">⏰ Clock</button>
+          <button class="ability-btn" data-ability="ds">🔄 Double Switch</button>
+          <button class="ability-btn" id="btn-cancel-move">✕ Annuler</button>
+        </div>
+        <div id="game-log" tabindex="0"></div>
+      </div>
+    </div>
+
+    <!-- Phase d'achat (overlay) -->
+    <div id="purchase-overlay" class="overlay" hidden>
+      <div class="purchase-card">
+        <h2>Phase d'achat — <span class="pbucks-left">10</span> Pbucks</h2>
+        <p>Achète des capacités pour cette partie. Les capacités non utilisées seront perdues.</p>
+        <div id="purchase-items"></div>
+        <button class="btn-primary" id="purchase-validate">Valider (10 Pbucks)</button>
+      </div>
+    </div>
+
+    <!-- Camp swap (overlay) -->
+    <div id="camp-swap-overlay" class="overlay" hidden>
+      <div class="swap-card">
+        <h2>Choisis ton camp</h2>
+        <p>Rouge vient de jouer. Tu es Bleu (vertical). Veux-tu échanger les camps ?</p>
+        <div class="swap-buttons">
+          <button class="btn-primary" id="swap-keep">Garder (Bleu)</button>
+          <button class="btn-secondary" id="swap-swap">Échanger (devenir Rouge)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Matchmaking overlay -->
+    <div id="matchmaking-overlay" class="overlay" hidden>
+      <div class="matchmaking-card">
+        <h2>Recherche d'adversaire…</h2>
+        <div class="loader"></div>
+        <p>Ton Elo : <span id="queue-elo">1000</span></p>
+        <button class="btn-secondary" id="cancel-queue">Annuler</button>
+      </div>
+    </div>
+
+    <!-- Private room overlay -->
+    <div id="private-room-overlay" class="overlay" hidden>
+      <div class="private-card">
+        <h2>Partie privée</h2>
+        <div class="private-actions">
+          <button class="btn-primary" id="create-private">Créer un salon</button>
+          <div class="private-join">
+            <input type="text" id="join-code-input" placeholder="Code (ex: ABC123)" maxlength="6">
+            <button class="btn-secondary" id="join-private">Rejoindre</button>
+          </div>
+          <div id="private-code-display" hidden>
+            <p>Ton code de salon :</p>
+            <div class="code-display" id="private-code">—</div>
+            <button class="btn-secondary" id="copy-private-code">Copier</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game over overlay -->
+    <div id="gameover-overlay" class="overlay" hidden>
+      <div class="gameover-card">
+        <h2 id="gameover-title">—</h2>
+        <div id="gameover-stats"></div>
+        <button class="btn-primary" id="gameover-continue">Continuer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== ADMIN SCREEN ============== -->
+  <div id="admin-screen" class="screen">
+    <header id="admin-topbar">
+      <button class="icon-btn" id="admin-back">← Retour</button>
+      <h1>Admin</h1>
+      <span id="admin-level">—</span>
+    </header>
+    <main id="admin-main">
+      <div class="admin-tabs">
+        <button class="admin-tab active" data-admin-tab="stats">Stats</button>
+        <button class="admin-tab" data-admin-tab="search">Recherche</button>
+        <button class="admin-tab" data-admin-tab="gifts">Cadeaux</button>
+        <button class="admin-tab" data-admin-tab="reports">Signalements</button>
+        <button class="admin-tab" data-admin-tab="logs">Logs</button>
+      </div>
+      <div id="admin-content"></div>
+    </main>
+  </div>
+
+  <!-- ============== GIFTS DRAWER ============== -->
+  <aside id="gifts-drawer" class="drawer">
+    <div class="drawer-content">
+      <header class="drawer-header">
+        <h2>🎁 Cadeaux reçus</h2>
+        <button class="icon-btn" id="close-gifts">✕</button>
+      </header>
+      <div id="gifts-list"></div>
+    </div>
+  </aside>
+  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+
+  <!-- ============== SETTINGS MODAL ============== -->
+  <div id="settings-modal" class="modal" hidden>
+    <div class="modal-content">
+      <header class="modal-header">
+        <h2>⚙️ Paramètres</h2>
+        <button class="icon-btn" id="close-settings">✕</button>
+      </header>
+      <div class="modal-body">
+        <div class="setting-row">
+          <label>Sons</label>
+          <input type="checkbox" id="setting-sounds">
+          <input type="range" id="setting-sounds-volume" min="0" max="100" value="80">
+        </div>
+        <div class="setting-row">
+          <label>Musique ambient</label>
+          <input type="checkbox" id="setting-music">
+          <input type="range" id="setting-music-volume" min="0" max="100" value="40">
+        </div>
+        <div class="setting-row">
+          <label>Thème</label>
+          <select id="setting-theme">
+            <option value="dark">Sombre</option>
+            <option value="light">Clair</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label>Animations</label>
+          <input type="checkbox" id="setting-animations" checked>
+        </div>
+        <div class="setting-row">
+          <label>Langue</label>
+          <select id="setting-lang">
+            <option value="fr">Français</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== CHEST OPENING ANIMATION ============== -->
+  <div id="chest-overlay" class="chest-overlay" hidden>
+    <div class="chest-scene">
+      <img id="chest-closed" src="/assets/skins/chest_closed.svg" alt="Coffre" class="chest-img">
+      <div id="chest-flash" class="chest-flash"></div>
+      <div id="chest-rewards" class="chest-rewards" hidden></div>
+      <p class="chest-hint" id="chest-hint">Clique pour ouvrir</p>
+    </div>
+  </div>
+
+  <!-- ============== TOAST NOTIFICATIONS ============== -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts (modules SPA) -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/sounds.js"></script>
+  <script src="/js/settings.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/shop.js"></script>
+  <script src="/js/pass.js"></script>
+  <script src="/js/friends.js"></script>
+  <script src="/js/gifts.js"></script>
+  <script src="/js/game.js"></script>
+  <script src="/js/dashboard.js"></script>
+  <script src="/js/admin.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

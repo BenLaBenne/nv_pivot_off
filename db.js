@@ -1,0 +1,63 @@
+// db.js — pool PostgreSQL partagé
+const { Pool } = require('pg');
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.error('[db] DATABASE_URL manquant dans .env');
+  process.exit(1);
+}
+
+const pool = new Pool({
+  connectionString,
+  // alwaysdata : connexions SSL souvent requises en prod
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+
+pool.on('error', (err) => {
+  console.error('[db] Erreur pool PostgreSQL:', err.message);
+});
+
+// Helper query : promisifié avec params
+async function query(text, params) {
+  const start = Date.now();
+  try {
+    const res = await pool.query(text, params);
+    const duration = Date.now() - start;
+    if (duration > 500) {
+      console.log(`[db] slow query (${duration}ms):`, text.substring(0, 80));
+    }
+    return res;
+  } catch (err) {
+    console.error('[db] query error:', err.message, '\nSQL:', text.substring(0, 200));
+    throw err;
+  }
+}
+
+// Helper transaction
+async function withTransaction(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = {
+  pool,
+  query,
+  withTransaction,
+};

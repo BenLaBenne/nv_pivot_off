@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220">
+  <defs>
+    <linearGradient id="chest-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#92400E"/>
+      <stop offset="100%" stop-color="#451A03"/>
+    </linearGradient>
+    <linearGradient id="chest-lid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#B45309"/>
+      <stop offset="100%" stop-color="#78350F"/>
+    </linearGradient>
+  </defs>
+  <!-- Body -->
+  <rect x="40" y="100" width="140" height="80" fill="url(#chest-body)" rx="6"/>
+  <!-- Lid -->
+  <path d="M 40 100 Q 40 60 110 60 Q 180 60 180 100 Z" fill="url(#chest-lid)"/>
+  <!-- Bands -->
+  <rect x="36" y="120" width="148" height="6" fill="#FBBF24"/>
+  <rect x="36" y="150" width="148" height="6" fill="#FBBF24"/>
+  <!-- Lock -->
+  <rect x="98" y="105" width="24" height="24" fill="#FBBF24" rx="2"/>
+  <circle cx="110" cy="117" r="4" fill="#1a1f2e"/>
+  <!-- Decorative -->
+  <text x="110" y="200" text-anchor="middle" font-size="14" fill="#FBBF24" font-weight="900">PIVOT</text>
+</svg>
