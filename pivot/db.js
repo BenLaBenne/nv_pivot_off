@@ -11,11 +11,15 @@ if (!connectionString) {
   process.exit(1);
 }
 
+// Auto-détection SSL : active SSL si DB_SSL=true OU si l'URL contient alwaysdata.net
+// (les connexions externes vers alwaysdata exigent souvent SSL)
+const needsSsl = process.env.DB_SSL === 'true' || connectionString.includes('alwaysdata.net');
+
 const pool = new Pool({
   connectionString,
-  // alwaysdata : connexions SSL souvent requises en prod
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
-  max: 10,
+  ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
+  // alwaysdata : max 50 connexions par user en Public Cloud — on reste large
+  max: parseInt(process.env.DB_POOL_MAX || '10', 10),
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
 });

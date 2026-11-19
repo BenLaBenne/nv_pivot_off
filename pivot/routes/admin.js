@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { query, withTransaction } = require('../db');
 const { requireAuth, requireAdmin, requireAdminLevel, wrap } = require('./_middleware');
+const gameSocket = require('../sockets/game-socket');
 
 // Log une action admin
 async function logAdmin(client, adminId, action, targetId, details) {
@@ -16,13 +17,22 @@ async function logAdmin(client, adminId, action, targetId, details) {
 // GET /api/admin/stats — stats globales (admin principal seulement)
 router.get('/stats', requireAuth, requireAdmin, wrap(async (req, res) => {
   const users = await query('SELECT COUNT(*)::int AS c FROM users');
-  const online = await query('SELECT COUNT(*)::int AS c FROM users WHERE last_login > NOW() - INTERVAL \'10 minutes\'');
+  // Online = connecté au socket (priorité) ou last_seen récent
+  let onlineCount = 0;
+  try {
+    const onlineSet = gameSocket.getOnlineUserIds();
+    onlineCount = onlineSet.size;
+  } catch (e) {
+    // fallback : last_seen < 5 min
+    const r = await query('SELECT COUNT(*)::int AS c FROM users WHERE last_seen > NOW() - INTERVAL \'5 minutes\'');
+    onlineCount = r.rows[0].c;
+  }
   const matches = await query('SELECT COUNT(*)::int AS c, COALESCE(SUM(CASE WHEN winner_id IS NOT NULL THEN 1 ELSE 0 END),0)::int AS finished FROM matches');
   const banned = await query('SELECT COUNT(*)::int AS c FROM users WHERE banned = TRUE');
   const reports = await query('SELECT COUNT(*)::int AS c FROM reports WHERE status = \'open\'');
   res.json({
     users: users.rows[0].c,
-    online: online.rows[0].c,
+    online: onlineCount,
     matchesTotal: matches.rows[0].c,
     matchesFinished: matches.rows[0].finished,
     banned: banned.rows[0].c,
@@ -56,6 +66,12 @@ router.post('/gift', requireAuth, requireAdmin, wrap(async (req, res) => {
     `INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES ($1, 'gift', $2, $3)`,
     [req.user.id, user_id, JSON.stringify({ gift_type, gift_data })]
   );
+  // Notifier le user en temps réel
+  try {
+    gameSocket.notifyGiftReceived(user_id, {
+      id: r.rows[0].id, gift_type, gift_data, message,
+    });
+  } catch (e) {}
   res.json({ ok: true, giftId: r.rows[0].id });
 }));
 
@@ -67,9 +83,17 @@ router.post('/gift-all', requireAuth, requireAdminLevel(2), wrap(async (req, res
   const r = await query(
     `INSERT INTO admin_gifts (user_id, gift_type, gift_data, message)
      SELECT id, $1, $2, $3 FROM users WHERE banned = FALSE
-     RETURNING id`,
+     RETURNING id, user_id`,
     [gift_type, gift_data ? JSON.stringify(gift_data) : null, message || null]
   );
+  // Notifier tous les users online en temps réel
+  try {
+    for (const row of r.rows) {
+      gameSocket.notifyGiftReceived(row.user_id, {
+        id: row.id, gift_type, gift_data, message,
+      });
+    }
+  } catch (e) {}
   await query(
     `INSERT INTO admin_logs (admin_id, action, details) VALUES ($1, 'gift_all', $2)`,
     [req.user.id, JSON.stringify({ gift_type, gift_data, count: r.rowCount })]

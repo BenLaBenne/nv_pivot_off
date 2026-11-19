@@ -34,6 +34,7 @@ const API = {
   login: (username, password) => api('/api/auth/login', { method: 'POST', body: { username, password } }),
   logout: () => api('/api/auth/logout', { method: 'POST' }),
   me: () => api('/api/auth/me'),
+  socketToken: () => api('/api/auth/socket-token'),
 
   // Shop & chests
   listChests: () => api('/api/shop/chests'),

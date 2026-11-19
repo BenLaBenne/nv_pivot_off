@@ -1,5 +1,7 @@
 // sockets/game-socket.js — matchmaking + coups en temps réel
 // Gère : file d'attente ranked, salons privés, phase d'achat, coups, fin de partie.
+// + Tracking online/offline pour les amis (real-time)
+// + Notifications cadeaux reçues (real-time, appelé par routes/admin.js)
 const jwt = require('jsonwebtoken');
 const { query, withTransaction } = require('../db');
 const { rankedQueue, startMatchmakingTicker } = require('../matchmaking');
@@ -20,8 +22,8 @@ const userGames = new Map();
 const socketUsers = new Map();
 // Map userId -> socketId
 const userSockets = new Map();
-// Map socketId -> { gameId } pour private rooms
-const socketRooms = new Map();
+// Set des userIds actuellement online (au moins 1 socket connectée)
+const onlineUsers = new Set();
 // Salons privés en mémoire (code => { hostSocketId, hostId, hostElo, status })
 const privateRooms = new Map();
 
@@ -34,6 +36,44 @@ function notifyUser(userId, event, data) {
   if (sid && io) {
     io.to(sid).emit(event, data);
   }
+}
+
+function isUserOnline(userId) {
+  return onlineUsers.has(userId);
+}
+
+// Récupère la liste des userId amis acceptés d'un user
+async function getFriendIds(userId) {
+  const r = await query(
+    `SELECT user_id AS id FROM friendships WHERE friend_id = $1 AND status = 'accepted'
+     UNION
+     SELECT friend_id AS id FROM friendships WHERE user_id = $1 AND status = 'accepted'`,
+    [userId]
+  );
+  return r.rows.map(x => x.id);
+}
+
+// Broadcast un event à tous les amis online d'un user
+async function broadcastToFriends(userId, event, data) {
+  const friendIds = await getFriendIds(userId);
+  for (const fid of friendIds) {
+    if (onlineUsers.has(fid)) notifyUser(fid, event, data);
+  }
+}
+
+// Notifie un user qu'il a reçu un cadeau (appelé par routes/admin.js)
+async function notifyGiftReceived(userId, gift) {
+  notifyUser(userId, 'gift:received', gift);
+}
+
+// Notifie un user qu'il a reçu une demande d'ami (appelé par routes/friends.js)
+async function notifyFriendRequest(toUserId, fromUser) {
+  notifyUser(toUserId, 'friend:request', fromUser);
+}
+
+// Notifie un user qu'une demande a été acceptée (appelé par routes/friends.js)
+async function notifyFriendAccepted(toUserId, fromUser) {
+  notifyUser(toUserId, 'friend:accepted', fromUser);
 }
 
 let io = null;
@@ -53,9 +93,19 @@ function init(socketIo) {
     }
   });
 
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
+    const wasOnline = onlineUsers.has(socket.userId);
     socketUsers.set(socket.id, socket.userId);
     userSockets.set(socket.userId, socket.id);
+    // Marquer online + update last_seen en DB
+    onlineUsers.add(socket.userId);
+    try {
+      await query('UPDATE users SET last_seen = NOW() WHERE id = $1', [socket.userId]);
+    } catch (e) { /* non-bloquant */ }
+    // Si c'est la 1ère socket de ce user, broadcast friend:online
+    if (!wasOnline) {
+      broadcastToFriends(socket.userId, 'friend:online', { userId: socket.userId });
+    }
 
     // Rejoindre une partie active si elle existe
     const gid = userGames.get(socket.userId);
@@ -209,11 +259,20 @@ function init(socketIo) {
     });
 
     // ---- Disconnect ----
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       const userId = socketUsers.get(socket.id);
       socketUsers.delete(socket.id);
       if (userSockets.get(userId) === socket.id) {
         userSockets.delete(userId);
+        // Si l'utilisateur n'a plus aucune socket, marquer offline
+        const stillConnected = Array.from(socketUsers.values()).includes(userId);
+        if (!stillConnected) {
+          onlineUsers.delete(userId);
+          // Mettre à jour last_seen en DB
+          try { await query('UPDATE users SET last_seen = NOW() WHERE id = $1', [userId]); } catch (e) {}
+          // Broadcast friend:offline
+          broadcastToFriends(userId, 'friend:offline', { userId });
+        }
       }
       // Retirer de la file d'attente
       rankedQueue.removeBySocket(socket.id);
@@ -421,4 +480,10 @@ async function finishGameInternal(game, winnerId, loserId, opts = {}) {
   }, 30000);
 }
 
-module.exports = { init, getGameOfUser, notifyUser };
+module.exports = {
+  init, getGameOfUser, notifyUser,
+  isUserOnline, getFriendIds,
+  notifyGiftReceived, notifyFriendRequest, notifyFriendAccepted,
+  // Pour check depuis routes/friends.js si user online (pour status)
+  getOnlineUserIds: () => onlineUsers,
+};

@@ -1,5 +1,16 @@
-// js/friends.js — UI Friends (ID, demandes, liste)
+// js/friends.js — UI Friends (ID, demandes, liste) + real-time status
+let friendsContainer = null;
+
 Views.friends = async function (container) {
+  friendsContainer = container;
+  await renderFriends();
+  // Bind socket events (une seule fois)
+  bindFriendSocketEvents();
+};
+
+async function renderFriends() {
+  const container = friendsContainer;
+  if (!container) return;
   container.innerHTML = '<div class="empty-state"><div class="loader"></div><p>Chargement...</p></div>';
   try {
     const r = await API.getFriends();
@@ -30,16 +41,17 @@ Views.friends = async function (container) {
         <h3>Mes amis (${r.friends.length})</h3>
         ${r.friends.length === 0 ? '<div class="empty-state"><div class="empty-state-icon">👥</div><p>Tu n\'as pas encore d\'ami</p></div>' :
           r.friends.map(f => `
-            <div class="friend-item">
+            <div class="friend-item" data-friend-id="${f.id}">
               <div>
-                <span class="friend-status offline"></span>
+                <span class="friend-status ${f.online ? 'online' : 'offline'}"></span>
                 <strong>${f.username}</strong>
                 <span style="color:var(--text-dim); font-size:12px;"> · 🏆 ${f.trophies || 0} · ${f.matches_won || 0}V/${f.matches_lost || 0}D</span>
                 ${f.is_admin ? ' 🛡️' : ''}
+                ${f.online ? '<span style="color:var(--success); font-size:11px; margin-left:4px;">● online</span>' : ''}
               </div>
               <div class="friend-actions">
                 <button data-action="profile" data-id="${f.id}">👤</button>
-                <button data-action="defy" data-id="${f.id}" data-username="${f.username}">⚔️</button>
+                <button data-action="defy" data-id="${f.id}" data-username="${f.username}" ${f.online ? '' : 'disabled'}>⚔️</button>
                 <button data-action="remove" data-id="${f.id}">🗑️</button>
               </div>
             </div>
@@ -59,7 +71,7 @@ Views.friends = async function (container) {
         Sounds.playSound('friend_request');
         if (r.status === 'accepted') Toast.show(`${r.username} est maintenant ton ami !`, 'success');
         else Toast.show(`Demande envoyée à ${r.username}`, 'info');
-        Views.friends(container);
+        renderFriends();
       } catch (e) { Toast.show(e.message, 'error'); }
     };
     container.querySelectorAll('.friend-item button').forEach(btn => {
@@ -78,14 +90,59 @@ Views.friends = async function (container) {
             Game.openPrivateRoom();
             return;
           }
-          Views.friends(container);
+          renderFriends();
         } catch (e) { Toast.show(e.message, 'error'); }
       };
     });
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>${e.message}</p></div>`;
   }
-};
+}
+
+let friendSocketBound = false;
+function bindFriendSocketEvents() {
+  if (friendSocketBound) return;
+  friendSocketBound = true;
+  // Attendre que le socket soit prêt
+  function waitSocket() {
+    if (window.Game && Game.socket) {
+      const s = Game.socket;
+      s.on('friend:online', (data) => {
+        Toast.show(`👤 ${data.userId} est maintenant online`, 'info', 2000);
+        // Update UI si on est sur la vue friends
+        if (friendsContainer) {
+          const item = friendsContainer.querySelector(`.friend-item[data-friend-id="${data.userId}"] .friend-status`);
+          if (item) {
+            item.classList.remove('offline');
+            item.classList.add('online');
+          }
+        }
+      });
+      s.on('friend:offline', (data) => {
+        if (friendsContainer) {
+          const item = friendsContainer.querySelector(`.friend-item[data-friend-id="${data.userId}"] .friend-status`);
+          if (item) {
+            item.classList.remove('online');
+            item.classList.add('offline');
+          }
+        }
+      });
+      s.on('friend:request', (data) => {
+        Sounds.playSound('friend_request');
+        Toast.show(`📨 Demande d'ami reçue de ${data.from.username} !`, 'info', 5000);
+        // Re-render si sur la vue
+        if (friendsContainer) renderFriends();
+      });
+      s.on('friend:accepted', (data) => {
+        Toast.show(`✓ ${data.from.username} a accepté ta demande d'ami`, 'success');
+        if (friendsContainer) renderFriends();
+      });
+    } else {
+      setTimeout(waitSocket, 1000);
+    }
+  }
+  waitSocket();
+}
 
 function showProfileModal(user) {
   // Réutiliser la modal settings avec contenu profil
@@ -117,3 +174,4 @@ function showProfileModal(user) {
     modal.hidden = true;
   };
 }
+

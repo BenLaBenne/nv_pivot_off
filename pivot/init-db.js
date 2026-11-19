@@ -28,6 +28,8 @@ const SQL_STATEMENTS = [
     banned BOOLEAN DEFAULT FALSE,
     banned_reason TEXT,
     equipped_skin INTEGER,
+    last_login TIMESTAMP,
+    last_seen TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW()
   )`,
   `CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`,
@@ -49,7 +51,8 @@ const SQL_STATEMENTS = [
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     chest_type VARCHAR(16) NOT NULL,
     status VARCHAR(16) DEFAULT 'unopened',
-    opened_at TIMESTAMP
+    opened_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
   )`,
 
   // Skins
@@ -251,12 +254,35 @@ async function seedAdmin(client) {
   return true;
 }
 
+// Migrations idempotentes — appliquées sur des tables existantes
+// ( ALTER TABLE ... ADD COLUMN IF NOT EXISTS — PostgreSQL 9.6+ )
+const MIGRATIONS = [
+  `ALTER TABLE user_chests ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`,
+  // Index sur last_seen pour la query admin stats
+  `CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users(last_seen DESC)`,
+  // Index sur friendships.friend_id (deja créé plus haut, idempotent)
+  // Index sur matches.status pour les queries admin
+  `CREATE INDEX IF NOT EXISTS idx_matches_status ON matches(status)`,
+];
+
 async function initDb() {
   console.log('[init-db] Création des tables...');
   for (const stmt of SQL_STATEMENTS) {
     await pool.query(stmt);
   }
   console.log('[init-db] Tables OK');
+
+  console.log('[init-db] Migrations...');
+  for (const stmt of MIGRATIONS) {
+    try {
+      await pool.query(stmt);
+    } catch (e) {
+      console.warn('[init-db] migration skip:', e.message);
+    }
+  }
+  console.log('[init-db] Migrations OK');
 
   await withTransaction(async (client) => {
     await seedSkins(client);

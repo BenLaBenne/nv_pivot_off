@@ -1,4 +1,4 @@
-// js/gifts.js — slide gauche des cadeaux + badge
+// js/gifts.js — slide gauche des cadeaux + badge + real-time notifications
 const Gifts = {
   async openDrawer() {
     document.getElementById('gifts-drawer').classList.add('open');
@@ -80,6 +80,35 @@ const Gifts = {
     const badge = document.getElementById('gifts-badge');
     if (count > 0) { badge.textContent = count; badge.hidden = false; }
     else badge.hidden = true;
-  }
+  },
 };
+
+// Bind socket events pour les cadeaux reçus en temps réel
+let giftsSocketBound = false;
+function bindGiftsSocketEvents() {
+  if (giftsSocketBound) return;
+  giftsSocketBound = true;
+  function waitSocket() {
+    if (window.Game && Game.socket) {
+      const s = Game.socket;
+      s.on('gift:received', (data) => {
+        Sounds.playSound('chest_open');
+        Toast.show(`🎁 Cadeau reçu ! Ouvre le drawer pour le réclamer.`, 'success', 5000);
+        Gifts.refreshBadge();
+        // Si le drawer est ouvert, re-render
+        const drawer = document.getElementById('gifts-drawer');
+        if (drawer.classList.contains('open')) Gifts.render();
+      });
+    } else {
+      setTimeout(waitSocket, 1000);
+    }
+  }
+  waitSocket();
+}
+
+// Auto-bind au chargement
+document.addEventListener('DOMContentLoaded', () => {
+  bindGiftsSocketEvents();
+});
+
 window.Gifts = Gifts;

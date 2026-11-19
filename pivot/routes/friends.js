@@ -3,8 +3,10 @@ const express = require('express');
 const router = express.Router();
 const { query, withTransaction } = require('../db');
 const { requireAuth, wrap } = require('./_middleware');
+const gameSocket = require('../sockets/game-socket');
 
 // GET /api/friends — liste des amis + demandes reçues + mon ID
+// + statut online/offline en temps réel (depuis la mémoire du socket)
 router.get('/', requireAuth, wrap(async (req, res) => {
   // Mon friend_id
   const myFriendId = req.user.friend_id;
@@ -37,7 +39,10 @@ router.get('/', requireAuth, wrap(async (req, res) => {
   `, [req.user.id]);
   res.json({
     myFriendId,
-    friends: accepted.rows,
+    friends: accepted.rows.map(u => ({
+      ...u,
+      online: gameSocket.isUserOnline(u.id),
+    })),
     requests: received.rows,
     sent: sent.rows,
   });
@@ -83,6 +88,12 @@ router.post('/add', requireAuth, wrap(async (req, res) => {
      ON CONFLICT DO NOTHING`,
     [req.user.id, targetId]
   );
+  // Notifier le target en temps réel
+  try {
+    gameSocket.notifyFriendRequest(targetId, {
+      from: { id: req.user.id, username: req.user.username, friend_id: req.user.friend_id },
+    });
+  } catch (e) {}
   res.json({ ok: true, status: 'pending', username: target.rows[0].username });
 }));
 
@@ -105,6 +116,12 @@ router.post('/accept', requireAuth, wrap(async (req, res) => {
         [req.user.id, fromId]
       );
     });
+    // Notifier l'autre user en temps réel
+    try {
+      gameSocket.notifyFriendAccepted(fromId, {
+        from: { id: req.user.id, username: req.user.username },
+      });
+    } catch (e) {}
     res.json({ ok: true });
   } catch (e) {
     if (e.message === 'Demande introuvable') return res.status(404).json({ error: e.message });

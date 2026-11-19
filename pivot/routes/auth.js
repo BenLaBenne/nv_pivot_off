@@ -23,9 +23,10 @@ router.post('/signup', wrap(async (req, res) => {
   try {
     await withTransaction(async (client) => {
       const friendId = await generateUniqueFriendId(client);
+      // Nouveaux users : 100 Pgs de départ pour tester le shop
       const r = await client.query(
-        `INSERT INTO users (username, password_hash, friend_id)
-         VALUES ($1, $2, $3) RETURNING id`,
+        `INSERT INTO users (username, password_hash, friend_id, pgs, last_login)
+         VALUES ($1, $2, $3, 100, NOW()) RETURNING id`,
         [username, hash, friendId]
       );
       userId = r.rows[0].id;
@@ -64,6 +65,8 @@ router.post('/login', wrap(async (req, res) => {
   if (user.banned) return res.status(403).json({ error: 'Banni', reason: user.banned_reason });
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return res.status(401).json({ error: 'Identifiants invalides' });
+  // Mettre à jour last_login
+  await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
   const token = signToken(user.id);
   res.cookie('token', token, {
     httpOnly: true,
@@ -79,6 +82,21 @@ router.post('/logout', (req, res) => {
   res.clearCookie('token');
   res.json({ ok: true });
 });
+
+// GET /api/auth/socket-token — renvoie un JWT court (1h) pour authentifier le socket
+// (le cookie httpOnly principal n'est pas lisible par JS, on envoie donc un token
+//  via le body que le client passera à Socket.io handshake auth)
+router.get('/socket-token', authMiddleware, requireAuth, wrap(async (req, res) => {
+  // Re-signe un token avec un TTL court dédié au socket
+  const jwt = require('jsonwebtoken');
+  const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+  const socketToken = jwt.sign(
+    { uid: req.user.id, scope: 'socket' },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+  res.json({ token: socketToken });
+}));
 
 // GET /api/auth/me
 router.get('/me', authMiddleware, requireAuth, wrap(async (req, res) => {

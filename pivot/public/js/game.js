@@ -19,13 +19,21 @@ const Game = {
   myPurchase: { pivot: 0, diagonale: 0, tp: 0, clock: 0, ds: 0, hamer: 0 },
   pbucksLeft: 10,
 
-  initSocket() {
+  async initSocket() {
     if (this.socket) return;
-    // Récupérer le token JWT depuis le cookie
-    const token = this.getCookie('token');
-    if (!token) { console.warn('Pas de token pour le socket'); return; }
-    this.socket = io({ auth: { token } });
-    this.bindSocketEvents();
+    // Récupérer un token JWT dédié au socket depuis l'API
+    // (le cookie httpOnly principal n'est pas lisible par JS)
+    try {
+      const r = await API.socketToken ? API.socketToken() : (await fetch('/api/auth/socket-token', { credentials: 'same-origin' }).then(r => r.json()));
+      const token = r.token;
+      if (!token) { console.warn('Pas de token pour le socket'); return; }
+      this.socket = io({ auth: { token } });
+      this.bindSocketEvents();
+    } catch (e) {
+      console.error('[socket] erreur init:', e.message);
+      // Retry dans 3s
+      setTimeout(() => this.initSocket(), 3000);
+    }
   },
 
   getCookie(name) {
